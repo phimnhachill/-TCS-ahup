@@ -1,0 +1,1072 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PowerSim VN - Trình Mô Phỏng Điện Tử Công Suất</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- KaTeX CDN for Math Equations -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    .trace-canvas { image-rendering: pixelated; }
+    /* Tùy chỉnh thanh cuộn */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #1e293b; }
+    ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col">
+
+  <!-- HEADER -->
+  <header class="border-b border-slate-800 bg-slate-900/90 backdrop-blur sticky top-0 z-50 px-4 py-3">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center font-black text-xl text-white shadow-lg shadow-blue-500/30">
+          ⚡
+        </div>
+        <div>
+          <h1 class="text-lg font-bold text-white leading-tight">PowerSim VN</h1>
+          <p class="text-xs text-blue-400 font-medium">Hệ thống Trực quan hóa & Giải thuật Dạng sóng ĐTCS</p>
+        </div>
+      </div>
+
+      <div class="flex items-center space-x-2">
+        <button onclick="openApiModal()" class="px-3 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 border border-slate-700 flex items-center gap-1.5 transition">
+          <span>🔑</span> <span id="apiKeyStatusText">Cài đặt API Key</span>
+        </button>
+        <span class="text-xs px-2.5 py-1 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 font-medium">
+          Ôn thi cấp tốc 3 ngày
+        </span>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN CONTAINER -->
+  <main class="max-w-7xl mx-auto w-full p-4 grid grid-cols-1 lg:grid-cols-12 gap-5 flex-1">
+
+    <!-- CỘT BÊN TRÁI: ĐIỀU KHIỂN & BỘ GIẢI BÀI TẬP (5 Cột) -->
+    <div class="lg:col-span-5 flex flex-col gap-4">
+
+      <!-- KHUNG NHẬN DIỆN ĐỀ BÀI (AI VISION / TEXT / KÉO THẢ) -->
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-xl">
+        <div class="flex items-center justify-between mb-2">
+          <h2 class="text-sm font-bold text-slate-200 flex items-center gap-2">
+            <span>📷</span> Nhận diện & Trợ lý Đề thi
+          </h2>
+          <span class="text-[11px] text-slate-400">Dán ảnh hoặc nhập văn bản</span>
+        </div>
+
+        <!-- Vùng kéo thả & dán ảnh -->
+        <div id="dropZone" class="border-2 border-dashed border-slate-700 hover:border-blue-500 rounded-lg p-3 text-center transition cursor-pointer bg-slate-950/50 mb-3"
+             onclick="document.getElementById('fileInput').click()">
+          <input type="file" id="fileInput" accept="image/*" class="hidden" onchange="handleFileSelect(event)">
+          <div id="previewArea" class="flex flex-col items-center justify-center">
+            <svg class="w-8 h-8 text-slate-500 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+            </svg>
+            <p class="text-xs text-slate-400 font-medium">Bấm tải ảnh lên, kéo-thả hoặc bấm <kbd class="px-1 py-0.5 bg-slate-800 rounded border border-slate-700 text-slate-300">Ctrl + V</kbd> dán ảnh</p>
+          </div>
+        </div>
+
+        <!-- Ô nhập text tự do -->
+        <div class="flex gap-2">
+          <input type="text" id="promptInput" placeholder="Ví dụ: Chỉnh lưu cầu 3 pha U=220V, R=10, L lớn, alpha=75 độ"
+                 class="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                 onkeydown="if(event.key==='Enter') processExercisePrompt()">
+          <button onclick="processExercisePrompt()" id="btnAnalyze" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-xs font-bold text-white rounded-lg shadow-md transition flex items-center gap-1">
+            <span>Giải</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- PHÍM TẮT DẠNG BÀI KINH ĐIỂN CỦA ĐỀ THI -->
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-3.5 shadow-xl">
+        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2.5">Dạng bài trọng tâm trong slide</h3>
+        <div class="grid grid-cols-2 gap-2 text-xs">
+          <button onclick="loadPreset('3ph_half_r')" class="p-2 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-left font-medium text-slate-200 transition">
+            1. CL Tia 3 pha (Tải R)
+          </button>
+          <button onclick="loadPreset('3ph_bridge_l')" class="p-2 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-left font-medium text-emerald-400 transition">
+            2. CL Cầu 3 pha (Tải L lớn)
+          </button>
+          <button onclick="loadPreset('buck_ccm')" class="p-2 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-left font-medium text-blue-400 transition">
+            3. Băm áp Buck (Hạ áp)
+          </button>
+          <button onclick="loadPreset('boost_ccm')" class="p-2 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-left font-medium text-amber-400 transition">
+            4. Băm áp Boost (Tăng áp)
+          </button>
+          <button onclick="loadPreset('ac_ac_1ph')" class="p-2 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-left font-medium text-purple-400 transition">
+            5. Điều áp AC 1 pha (R-L)
+          </button>
+          <button onclick="loadPreset('inverter_3ph')" class="p-2 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-left font-medium text-rose-400 transition">
+            6. Nghịch lưu 3 pha 180°
+          </button>
+        </div>
+      </div>
+
+      <!-- BẢNG ĐIỀU CHỈNH THÔNG SỐ TRỰC TIẾP -->
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-xl flex flex-col gap-3">
+        <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center justify-between">
+          <span>Tham số mạch điện</span>
+          <span id="circuitBadge" class="text-[11px] px-2 py-0.5 bg-blue-900/50 text-blue-300 rounded border border-blue-700">CL Tia 3 Pha</span>
+        </h3>
+
+        <!-- Chọn loại mạch -->
+        <div>
+          <label class="block text-[11px] font-semibold text-slate-400 mb-1">Cấu hình mạch</label>
+          <select id="circuitType" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-blue-500" onchange="onCircuitChange()">
+            <optgroup label="Chương 2: Chỉnh lưu AC - DC">
+              <option value="3ph_half">Chỉnh lưu tia 3 pha có điều khiển (3 SCR)</option>
+              <option value="3ph_bridge">Chỉnh lưu cầu 3 pha có điều khiển (6 SCR)</option>
+              <option value="1ph_bridge">Chỉnh lưu cầu 1 pha có điều khiển (4 SCR)</option>
+            </optgroup>
+            <optgroup label="Chương 3: Băm áp DC - DC">
+              <option value="buck">DC-DC Buck Converter (Hạ áp)</option>
+              <option value="boost">DC-DC Boost Converter (Tăng áp)</option>
+              <option value="buck_boost">DC-DC Buck-Boost (Đảo cực tính)</option>
+            </optgroup>
+            <optgroup label="Chương 4: Điều áp AC - AC">
+              <option value="ac_ac_1ph">Điều áp xoay chiều 1 pha (2 SCR song song ngược)</option>
+            </optgroup>
+            <optgroup label="Chương 5: Nghịch lưu DC - AC">
+              <option value="inverter_3ph_180">Nghịch lưu độc lập 3 pha 180° (6 bước - Six Step)</option>
+            </optgroup>
+          </select>
+        </div>
+
+        <!-- Khối Slider tham số linh hoạt -->
+        <div class="space-y-3 pt-1">
+          <!-- Điện áp nguồn Vin / U2 -->
+          <div>
+            <div class="flex justify-between text-xs font-medium mb-1">
+              <span class="text-slate-400" id="labelVoltage">Điện áp nguồn pha U2 (RMS):</span>
+              <span id="valVoltage" class="text-white font-bold">220 V</span>
+            </div>
+            <input type="range" id="paramVoltage" min="12" max="400" step="1" value="220" class="w-full accent-blue-500" oninput="updateSimulation()">
+          </div>
+
+          <!-- Góc kích Alpha hoặc Duty cycle D -->
+          <div id="wrapperAlpha">
+            <div class="flex justify-between text-xs font-medium mb-1">
+              <span class="text-slate-400" id="labelAlpha">Góc kích điều khiển (α):</span>
+              <span id="valAlpha" class="text-amber-400 font-bold">30° (π/6)</span>
+            </div>
+            <input type="range" id="paramAlpha" min="0" max="150" step="1" value="30" class="w-full accent-amber-500" oninput="updateSimulation()">
+          </div>
+
+          <!-- Chu kỳ xung D (chỉ hiện khi DC-DC) -->
+          <div id="wrapperDuty" class="hidden">
+            <div class="flex justify-between text-xs font-medium mb-1">
+              <span class="text-slate-400">Hệ số chu kỳ (Duty Cycle D):</span>
+              <span id="valDuty" class="text-cyan-400 font-bold">0.40</span>
+            </div>
+            <input type="range" id="paramDuty" min="0.05" max="0.95" step="0.01" value="0.40" class="w-full accent-cyan-500" oninput="updateSimulation()">
+          </div>
+
+          <!-- Lựa chọn tính chất tải -->
+          <div class="grid grid-cols-2 gap-2 pt-1">
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-400 mb-1">Tính chất tải</label>
+              <select id="loadType" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-1.5 text-xs text-white" onchange="updateSimulation()">
+                <option value="R">Thuần trở (R)</option>
+                <option value="RL_large">Cảm tính (L rất lớn - Dòng phẳng)</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-400 mb-1">Điện trở tải R (Ω)</label>
+              <input type="number" id="paramR" value="10" min="1" max="1000" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-1.5 text-xs text-white" onchange="updateSimulation()">
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- CỘT BÊN PHẢI: OSCILLOSCOPE DẠNG SÓNG & THUYẾT MINH TOÁN HỌC (7 Cột) -->
+    <div class="lg:col-span-7 flex flex-col gap-4">
+
+      <!-- KHUNG MÀN HÌNH OSCILLOSCOPE -->
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-xl flex flex-col">
+        <div class="flex items-center justify-between mb-3 border-b border-slate-800 pb-2">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+            <h2 class="text-sm font-bold text-white tracking-wide">Màn hình Dao động ký (Oscilloscope)</h2>
+          </div>
+          <!-- Chú giải kênh màu -->
+          <div class="flex items-center gap-3 text-[11px]">
+            <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-rose-500"></span> Pha A</span>
+            <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-blue-500"></span> Pha B</span>
+            <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-500"></span> Pha C</span>
+            <span class="flex items-center gap-1"><span class="w-3 h-1 bg-amber-400"></span> Điện áp tải $u_d$</span>
+          </div>
+        </div>
+
+        <!-- CANVAS KHUNG HÌNH CHÍNH -->
+        <div class="relative bg-slate-950 rounded-lg border border-slate-800 overflow-hidden">
+          <canvas id="scopeCanvas" width="800" height="420" class="w-full h-auto block trace-canvas"></canvas>
+          <!-- Tooltip đo điểm -->
+          <div id="scopeTooltip" class="absolute top-2 left-2 bg-slate-900/90 border border-slate-700 px-2 py-1 rounded text-[11px] text-slate-300 pointer-events-none hidden font-mono"></div>
+        </div>
+      </div>
+
+      <!-- KHUNG LỜI GIẢI CHI TIẾT & BẮT BẪY PHÒNG THI -->
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-xl flex-1 flex flex-col">
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="text-xs font-bold text-blue-400 uppercase tracking-wider flex items-center gap-1.5">
+            <span>📝</span> Phân tích lý thuyết & Công thức tính toán
+          </h3>
+          <span class="text-[11px] text-emerald-400 font-semibold" id="calcModeStatus">Trạng thái: Dẫn liên tục</span>
+        </div>
+
+        <!-- Hộp cảnh báo bẫy phòng thi -->
+        <div id="trapWarningBox" class="bg-amber-950/40 border border-amber-600/40 rounded-lg p-2.5 mb-3 text-xs text-amber-200">
+          <!-- Nội dung cảnh báo được JS điền vào -->
+        </div>
+
+        <!-- Lời giải toán KaTeX -->
+        <div id="mathSolutionBox" class="text-xs text-slate-300 space-y-2 flex-1 overflow-y-auto max-h-72 pr-1">
+          <!-- Công thức KaTeX render động -->
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- MODAL: CÀI ĐẶT API KEY CHO GEMINI -->
+  <div id="apiModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border border-slate-700 rounded-xl max-w-md w-full p-5 shadow-2xl">
+      <div class="flex justify-between items-center mb-3">
+        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+          <span>🔑</span> Nhập Google Gemini API Key
+        </h3>
+        <button onclick="closeApiModal()" class="text-slate-400 hover:text-white">&times;</button>
+      </div>
+      <p class="text-xs text-slate-400 mb-3 leading-relaxed">
+        Key được lưu trực tiếp trên trình duyệt của bạn (<code class="text-blue-400">localStorage</code>), không bao giờ bị đẩy lên GitHub hoặc máy chủ khác.
+      </p>
+      <input type="password" id="inputApiKey" placeholder="AIzaSy..." class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white mb-3 focus:outline-none focus:border-blue-500">
+      <div class="flex justify-between items-center text-xs">
+        <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-blue-400 hover:underline">Lấy API Key miễn phí tại đây ↗</a>
+        <div class="flex gap-2">
+          <button onclick="closeApiModal()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg">Đóng</button>
+          <button onclick="saveApiKey()" class="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg">Lưu Key</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- JAVASCRIPT TOÁN HỌC & ENGINE OSCILLOSCOPE -->
+  <script>
+    // State của ứng dụng
+    const state = {
+      circuit: '3ph_half',
+      voltage: 220,
+      alpha: 30, // độ
+      duty: 0.4,
+      load: 'R',
+      R: 10,
+      L: 0.01,
+      f: 50,
+      base64Image: null
+    };
+
+    // Khởi tạo ban đầu
+    window.onload = function() {
+      checkApiKeyStatus();
+      setupPasteListener();
+      updateSimulation();
+    };
+
+    function checkApiKeyStatus() {
+      const key = localStorage.getItem('GEMINI_API_KEY');
+      const text = document.getElementById('apiKeyStatusText');
+      if (key && key.length > 5) {
+        text.innerText = "API Key: Đã lưu ✓";
+        text.classList.add("text-emerald-400");
+      } else {
+        text.innerText = "Cài đặt API Key";
+        text.classList.remove("text-emerald-400");
+      }
+    }
+
+    function openApiModal() {
+      document.getElementById('inputApiKey').value = localStorage.getItem('GEMINI_API_KEY') || '';
+      document.getElementById('apiModal').classList.remove('hidden');
+    }
+
+    function closeApiModal() {
+      document.getElementById('apiModal').classList.add('hidden');
+    }
+
+    function saveApiKey() {
+      const key = document.getElementById('inputApiKey').value.trim();
+      if(key) {
+        localStorage.setItem('GEMINI_API_KEY', key);
+      } else {
+        localStorage.removeItem('GEMINI_API_KEY');
+      }
+      checkApiKeyStatus();
+      closeApiModal();
+    }
+
+    // Lắng nghe Paste (Ctrl + V) ảnh trực tiếp từ màn hình chụp
+    function setupPasteListener() {
+      window.addEventListener('paste', function(e) {
+        const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+        for (let i = 0; i < items.length; i++) {
+          if (items[i].type.indexOf('image') !== -1) {
+            const blob = items[i].getAsFile();
+            const reader = new FileReader();
+            reader.onload = function(event) {
+              setPreviewImage(event.target.result);
+            };
+            reader.readAsDataURL(blob);
+            break;
+          }
+        }
+      });
+    }
+
+    function handleFileSelect(e) {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(event) {
+          setPreviewImage(event.target.result);
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+
+    function setPreviewImage(dataUrl) {
+      state.base64Image = dataUrl;
+      const preview = document.getElementById('previewArea');
+      preview.innerHTML = `
+        <img src="${dataUrl}" class="max-h-24 rounded border border-slate-700 shadow mx-auto mb-1 object-contain"/>
+        <p class="text-[11px] text-emerald-400 font-semibold">Đã tải ảnh lên! Bấm "Giải" để phân tích.</p>
+      `;
+    }
+
+    // Tải Preset mẫu kinh điển trong đề thi
+    function loadPreset(type) {
+      if(type === '3ph_half_r') {
+        state.circuit = '3ph_half';
+        state.voltage = 220;
+        state.alpha = 30;
+        state.load = 'R';
+        state.R = 5;
+      } else if(type === '3ph_bridge_l') {
+        state.circuit = '3ph_bridge';
+        state.voltage = 220;
+        state.alpha = 75;
+        state.load = 'RL_large';
+        state.R = 10;
+      } else if(type === 'buck_ccm') {
+        state.circuit = 'buck';
+        state.voltage = 50;
+        state.duty = 0.4;
+        state.load = 'R';
+        state.R = 20;
+      } else if(type === 'boost_ccm') {
+        state.circuit = 'boost';
+        state.voltage = 20;
+        state.duty = 0.6;
+        state.load = 'R';
+        state.R = 12.5;
+      } else if(type === 'ac_ac_1ph') {
+        state.circuit = 'ac_ac_1ph';
+        state.voltage = 220;
+        state.alpha = 60;
+        state.load = 'R';
+        state.R = 10;
+      } else if(type === 'inverter_3ph') {
+        state.circuit = 'inverter_3ph_180';
+        state.voltage = 220;
+        state.load = 'R';
+        state.R = 10;
+      }
+      syncInputsFromState();
+      updateSimulation();
+    }
+
+    function syncInputsFromState() {
+      document.getElementById('circuitType').value = state.circuit;
+      document.getElementById('paramVoltage').value = state.voltage;
+      document.getElementById('paramAlpha').value = state.alpha;
+      document.getElementById('paramDuty').value = state.duty;
+      document.getElementById('loadType').value = state.load;
+      document.getElementById('paramR').value = state.R;
+      onCircuitChange();
+    }
+
+    function onCircuitChange() {
+      state.circuit = document.getElementById('circuitType').value;
+      const isDCDC = ['buck', 'boost', 'buck_boost'].includes(state.circuit);
+      const isInv = state.circuit === 'inverter_3ph_180';
+
+      document.getElementById('wrapperAlpha').classList.toggle('hidden', isDCDC || isInv);
+      document.getElementById('wrapperDuty').classList.toggle('hidden', !isDCDC);
+
+      const labelV = document.getElementById('labelVoltage');
+      if(isDCDC) {
+        labelV.innerText = "Điện áp một chiều đầu vào Vin (V):";
+      } else if(isInv) {
+        labelV.innerText = "Điện áp nguồn DC bus (E):";
+      } else {
+        labelV.innerText = "Điện áp nguồn pha U2 (RMS):";
+      }
+
+      updateSimulation();
+    }
+
+    function updateSimulation() {
+      state.voltage = parseFloat(document.getElementById('paramVoltage').value);
+      state.alpha = parseFloat(document.getElementById('paramAlpha').value);
+      state.duty = parseFloat(document.getElementById('paramDuty').value);
+      state.load = document.getElementById('loadType').value;
+      state.R = parseFloat(document.getElementById('paramR').value) || 10;
+
+      // Cập nhật text hiển thị slider
+      document.getElementById('valVoltage').innerText = state.voltage + " V";
+      document.getElementById('valAlpha').innerText = `${state.alpha}° (${(state.alpha * Math.PI / 180).toFixed(2)} rad)`;
+      document.getElementById('valDuty').innerText = state.duty.toFixed(2);
+
+      // Cập nhật tên badge
+      const sel = document.getElementById('circuitType');
+      document.getElementById('circuitBadge').innerText = sel.options[sel.selectedIndex].text;
+
+      // Vẽ sóng lên Canvas
+      drawWaveforms();
+
+      // Tính toán & Render KaTeX
+      renderMathCalculations();
+    }
+
+    // ==========================================
+    // ENGINE VẼ DẠNG SÓNG TRÊN CANVAS
+    // ==========================================
+    function drawWaveforms() {
+      const canvas = document.getElementById('scopeCanvas');
+      const ctx = canvas.getContext('2d');
+      const W = canvas.width;
+      const H = canvas.height;
+
+      ctx.clearRect(0, 0, W, H);
+
+      // 1. Vẽ lưới tọa độ oscilloscope
+      ctx.strokeStyle = '#1e293b';
+      ctx.lineWidth = 1;
+      const xStep = W / 12; // 12 mốc chu kỳ (mỗi mốc 30 độ)
+      const yStep = H / 8;
+      for (let x = 0; x <= W; x += xStep) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, H);
+        ctx.stroke();
+      }
+      for (let y = 0; y <= H; y += yStep) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(W, y);
+        ctx.stroke();
+      }
+
+      // Trục 0V chuẩn
+      ctx.strokeStyle = '#334155';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(0, H * 0.5);
+      ctx.lineTo(W, H * 0.5);
+      ctx.stroke();
+
+      // 2. Tùy theo loại mạch mà vẽ hàm số tương ứng
+      const thetaMax = 2 * Math.PI; // Khảo sát 1 chu kỳ 360 độ (0 -> 2pi)
+      const radAlpha = (state.alpha * Math.PI) / 180;
+
+      if (state.circuit === '3ph_half') {
+        draw3PhaseHalfWave(ctx, W, H, thetaMax, radAlpha);
+      } else if (state.circuit === '3ph_bridge') {
+        draw3PhaseBridge(ctx, W, H, thetaMax, radAlpha);
+      } else if (state.circuit === 'buck') {
+        drawDCDCBuck(ctx, W, H);
+      } else if (state.circuit === 'boost') {
+        drawDCDBoost(ctx, W, H);
+      } else if (state.circuit === 'ac_ac_1ph') {
+        drawACAC1Phase(ctx, W, H, thetaMax, radAlpha);
+      } else if (state.circuit === 'inverter_3ph_180') {
+        drawInverter3Phase(ctx, W, H, thetaMax);
+      }
+    }
+
+    // Vẽ chỉnh lưu tia 3 pha có điều khiển
+    function draw3PhaseHalfWave(ctx, W, H, thetaMax, alpha) {
+      const peak = state.voltage * Math.sqrt(2);
+      const scaleY = (H * 0.35) / peak;
+      const midY = H * 0.5;
+
+      // Hàm tính áp từng pha:
+      // Pha A: sqrt(2)*U2*sin(t)
+      // Pha B: sqrt(2)*U2*sin(t - 2pi/3)
+      // Pha C: sqrt(2)*U2*sin(t + 2pi/3)
+      const uA = (t) => peak * Math.sin(t);
+      const uB = (t) => peak * Math.sin(t - 2 * Math.PI / 3);
+      const uC = (t) => peak * Math.sin(t + 2 * Math.PI / 3);
+
+      // Vẽ 3 đường sin nguồn nhạt
+      drawTrace(ctx, W, thetaMax, uA, midY, scaleY, '#f43f5e', 1.2, true); // Pha A: Đỏ
+      drawTrace(ctx, W, thetaMax, uB, midY, scaleY, '#3b82f6', 1.2, true); // Pha B: Xanh dương
+      drawTrace(ctx, W, thetaMax, uC, midY, scaleY, '#10b981', 1.2, true); // Pha C: Xanh lá
+
+      // Vẽ đường áp tải ud(t) nét đậm màu vàng
+      ctx.strokeStyle = '#fbbf24';
+      ctx.lineWidth = 3.5;
+      ctx.beginPath();
+
+      const isRL = state.load === 'RL_large';
+      const steps = 600;
+
+      for (let i = 0; i <= steps; i++) {
+        const t = (i / steps) * thetaMax;
+        const x = (t / thetaMax) * W;
+
+        // Điểm chuyển mạch tự nhiên: pi/6, 5pi/6, 9pi/6 (3pi/2)
+        // SCR1 kích tại pi/6 + alpha, dẫn đến 5pi/6 + alpha (nếu liên tục)
+        // Nếu tải R và alpha > 30 độ (pi/6), dòng chạm 0 tại pi
+        let ud = 0;
+
+        // Phân đoạn dẫn của 3 SCR
+        const t1_fire = Math.PI / 6 + alpha;
+        const t2_fire = 5 * Math.PI / 6 + alpha;
+        const t3_fire = 9 * Math.PI / 6 + alpha;
+
+        if (t >= t1_fire && t < t1_fire + 2 * Math.PI / 3) {
+          ud = uA(t);
+          if (!isRL && ud < 0) ud = 0; // Tải thuần R không bị âm
+        } else if (t >= t2_fire && t < t2_fire + 2 * Math.PI / 3) {
+          ud = uB(t);
+          if (!isRL && ud < 0) ud = 0;
+        } else {
+          ud = uC(t);
+          if (!isRL && ud < 0) ud = 0;
+        }
+
+        const y = midY - ud * scaleY;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+
+      // Vẽ các vạch gióng tự nhiên pi/6 và góc alpha
+      drawGirdMarker(ctx, W, thetaMax, Math.PI / 6, "π/6 (Tự nhiên)");
+      drawGirdMarker(ctx, W, thetaMax, Math.PI / 6 + alpha, "Kích SCR1", true);
+    }
+
+    // Vẽ chỉnh lưu cầu 3 pha
+    function draw3PhaseBridge(ctx, W, H, thetaMax, alpha) {
+      const peak = state.voltage * Math.sqrt(2);
+      const linePeak = Math.sqrt(3) * peak;
+      const scaleY = (H * 0.4) / linePeak;
+      const midY = H * 0.85;
+
+      ctx.strokeStyle = '#fbbf24';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+
+      const isRL = state.load === 'RL_large';
+      const steps = 600;
+
+      for (let i = 0; i <= steps; i++) {
+        const t = (i / steps) * thetaMax;
+        const x = (t / thetaMax) * W;
+
+        // Tần số đập mạch 6 lần chu kỳ: mốc pi/3 (60 độ)
+        const period = Math.PI / 3;
+        const t_mod = (t - (Math.PI / 6 + alpha)) % period;
+        const phi = (t_mod + period) % period; // chuẩn hóa
+
+        let ud = linePeak * Math.cos(phi - Math.PI / 6);
+        if (!isRL && ud < 0) ud = 0; // Tải R không bị âm
+
+        const y = midY - ud * scaleY;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+
+    // Vẽ bộ biến đổi DC-DC Buck
+    function drawDCDCBuck(ctx, W, H) {
+      const Vin = state.voltage;
+      const D = state.duty;
+      const Vo = Vin * D;
+
+      const scaleY = (H * 0.35) / Vin;
+      const midY = H * 0.7;
+
+      // Vẽ xung điện áp van đóng cắt Vx(t)
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      const period = W / 2; // 2 chu kỳ hiển thị
+
+      for (let cycle = 0; cycle < 2; cycle++) {
+        const startX = cycle * period;
+        const onX = startX + period * D;
+        const endX = startX + period;
+
+        ctx.moveTo(startX, midY - Vin * scaleY);
+        ctx.lineTo(onX, midY - Vin * scaleY);
+        ctx.lineTo(onX, midY);
+        ctx.lineTo(endX, midY);
+      }
+      ctx.stroke();
+
+      // Vẽ dòng iL(t) tam giác
+      ctx.strokeStyle = '#34d399';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      const deltaIL = 1.2; // minh họa
+      for (let cycle = 0; cycle < 2; cycle++) {
+        const startX = cycle * period;
+        const onX = startX + period * D;
+        const endX = startX + period;
+
+        const yMin = midY - (Vo - deltaIL * 3) * scaleY * 0.5;
+        const yMax = midY - (Vo + deltaIL * 3) * scaleY * 0.5;
+
+        ctx.moveTo(startX, yMin);
+        ctx.lineTo(onX, yMax);
+        ctx.lineTo(endX, yMin);
+      }
+      ctx.stroke();
+    }
+
+    // Vẽ bộ biến đổi DC-DC Boost
+    function drawDCDBoost(ctx, W, H) {
+      const Vin = state.voltage;
+      const D = state.duty;
+      const Vo = Vin / (1 - D);
+
+      const scaleY = (H * 0.35) / Vo;
+      const midY = H * 0.75;
+
+      const period = W / 2;
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+
+      // Điện áp trên cuộn cảm VL: khi ON = Vin, khi OFF = Vin - Vo
+      for (let cycle = 0; cycle < 2; cycle++) {
+        const startX = cycle * period;
+        const onX = startX + period * D;
+        const endX = startX + period;
+
+        ctx.moveTo(startX, midY - Vin * scaleY);
+        ctx.lineTo(onX, midY - Vin * scaleY);
+        ctx.lineTo(onX, midY - (Vin - Vo) * scaleY);
+        ctx.lineTo(endX, midY - (Vin - Vo) * scaleY);
+      }
+      ctx.stroke();
+    }
+
+    // Vẽ điều áp xoay chiều 1 pha
+    function drawACAC1Phase(ctx, W, H, thetaMax, alpha) {
+      const peak = state.voltage * Math.sqrt(2);
+      const scaleY = (H * 0.35) / peak;
+      const midY = H * 0.5;
+
+      const uSin = (t) => peak * Math.sin(t);
+      drawTrace(ctx, W, thetaMax, uSin, midY, scaleY, '#64748b', 1.2, true);
+
+      // Điện áp ra trên tải UR
+      ctx.strokeStyle = '#c084fc';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+
+      const steps = 600;
+      for (let i = 0; i <= steps; i++) {
+        const t = (i / steps) * thetaMax;
+        const x = (t / thetaMax) * W;
+
+        let uOut = 0;
+        if (t >= alpha && t < Math.PI) {
+          uOut = uSin(t);
+        } else if (t >= Math.PI + alpha && t < 2 * Math.PI) {
+          uOut = uSin(t);
+        }
+
+        const y = midY - uOut * scaleY;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+
+    // Vẽ nghịch lưu 3 pha 180 độ 6 bước
+    function drawInverter3Phase(ctx, W, H, thetaMax) {
+      const E = state.voltage;
+      const scaleY = (H * 0.35) / E;
+      const midY = H * 0.5;
+
+      // Vẽ điện áp pha uAn(t) theo 6 bậc: 2E/3, E/3, -E/3, -2E/3
+      ctx.strokeStyle = '#f43f5e';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+
+      const stepSize = thetaMax / 6;
+      for (let step = 0; step < 6; step++) {
+        const x1 = (step * stepSize / thetaMax) * W;
+        const x2 = ((step + 1) * stepSize / thetaMax) * W;
+
+        let u = 0;
+        if (step === 0) u = E / 3;
+        else if (step === 1) u = 2 * E / 3;
+        else if (step === 2) u = E / 3;
+        else if (step === 3) u = -E / 3;
+        else if (step === 4) u = -2 * E / 3;
+        else if (step === 5) u = -E / 3;
+
+        const y = midY - u * scaleY;
+        ctx.moveTo(x1, y);
+        ctx.lineTo(x2, y);
+      }
+      ctx.stroke();
+    }
+
+    function drawTrace(ctx, W, thetaMax, fn, midY, scaleY, color, width, dashed) {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      if (dashed) ctx.setLineDash([4, 4]);
+      else ctx.setLineDash([]);
+
+      ctx.beginPath();
+      const steps = 300;
+      for (let i = 0; i <= steps; i++) {
+        const t = (i / steps) * thetaMax;
+        const x = (t / thetaMax) * W;
+        const y = midY - fn(t) * scaleY;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    function drawGirdMarker(ctx, W, thetaMax, theta, text, isFire) {
+      const x = (theta / thetaMax) * W;
+      ctx.strokeStyle = isFire ? '#f59e0b' : '#475569';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([2, 2]);
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, ctx.canvas.height);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      ctx.fillStyle = isFire ? '#fbbf24' : '#94a3b8';
+      ctx.font = '10px monospace';
+      ctx.fillText(text, x + 3, isFire ? 24 : 12);
+    }
+
+    // ==========================================
+    // TÍNH TOÁN & THUYẾT MINH TOÁN HỌC (KATEX)
+    // ==========================================
+    function renderMathCalculations() {
+      const warningBox = document.getElementById('trapWarningBox');
+      const mathBox = document.getElementById('mathSolutionBox');
+      const statusBadge = document.getElementById('calcModeStatus');
+
+      const U2 = state.voltage;
+      const alphaDeg = state.alpha;
+      const alphaRad = (alphaDeg * Math.PI) / 180;
+      const R = state.R;
+
+      let warningHtml = "";
+      let mathHtml = "";
+
+      if (state.circuit === '3ph_half') {
+        const isRL = state.load === 'RL_large';
+        let Ud = 0;
+
+        if (isRL) {
+          // Tải L lớn dòng liên tục
+          Ud = 1.17 * U2 * Math.cos(alphaRad);
+          warningHtml = `⚠️ <b>LƯU Ý PHÒNG THI (Slide 64-67):</b> Tải có $L$ rất lớn (dòng liên tục), khi $\\alpha > 30^\\circ$ điện áp $u_d$ vẫn bị kéo âm một đoạn! Công thức chuẩn là $U_d = 1.17 U_2 \\cos\\alpha$, KHÔNG được cắt phần âm về 0.`;
+          mathHtml = `
+            <p><b>1. Điểm chuyển mạch tự nhiên:</b> Pha A bắt đầu vượt lên dương nhất tại $\\theta_1 = \\pi/6$ ($30^\\circ$).</p>
+            <p><b>2. Thời điểm cấp xung kích:</b> SCR1 mở tại $\\theta = \\pi/6 + \\alpha = ${ (30 + alphaDeg) }^\\circ$.</p>
+            <p><b>3. Tích phân điện áp trung bình (Tải L lớn):</b></p>
+            <div>$$U_d = \\frac{3}{2\\pi} \\int_{\\pi/6+\\alpha}^{5\\pi/6+\\alpha} \\sqrt{2}U_2 \\sin\\theta d\\theta = \\frac{3\\sqrt{6}}{2\\pi} U_2 \\cos\\alpha = 1.17 \\times ${U2} \\times \\cos(${alphaDeg}^\\circ) = \\mathbf{${Ud.toFixed(2)}\\text{ V}}$$</div>
+            <p><b>4. Dòng trung bình qua tải & qua mỗi SCR:</b></p>
+            <div>$$I_d = \\frac{U_d}{R} = \\frac{${Ud.toFixed(2)}}{${R}} = \\mathbf{${(Ud/R).toFixed(2)}\\text{ A}}, \\quad I_{SCR} = \\frac{I_d}{3} = \\mathbf{${(Ud/(3*R)).toFixed(2)}\\text{ A}}$$</div>
+            <p><b>5. Điện áp ngược cực đại đặt lên SCR:</b> $$U_{ng.max} = \\sqrt{6}U_2 = \\mathbf{${(Math.sqrt(6)*U2).toFixed(2)}\\text{ V}}$$</p>
+          `;
+        } else {
+          // Tải R thuần
+          if (alphaDeg <= 30) {
+            Ud = 1.17 * U2 * Math.cos(alphaRad);
+            mathHtml = `
+              <p><b>Trường hợp $\\alpha \\le 30^\\circ$ (Dòng liên tục):</b></p>
+              <div>$$U_d = 1.17 U_2 \\cos\\alpha = 1.17 \\times ${U2} \\times \\cos(${alphaDeg}^\\circ) = \\mathbf{${Ud.toFixed(2)}\\text{ V}}$$</div>
+            `;
+          } else {
+            Ud = (3 * Math.sqrt(2) / (2 * Math.PI)) * U2 * (1 + Math.cos(alphaRad + Math.PI / 6));
+            warningHtml = `⚠️ <b>LƯU Ý (Slide 67):</b> Tải thuần $R$ khi $\\alpha > 30^\\circ$ van tự khóa tại $\\pi$, tích phân ngắt tại $\\pi$. Công thức chuyển sang dạng cộng dồn $1 + \\cos(\\alpha + \\pi/6)$.`;
+            mathHtml = `
+              <p><b>Trường hợp $\\alpha > 30^\\circ$ (Dòng gián đoạn, $u_d$ chạm 0):</b></p>
+              <div>$$U_d = \\frac{3\\sqrt{2}}{2\\pi} U_2 \\left[1 + \\cos\\left(\\alpha + \\frac{\\pi}{6}\\right)\\right] = \\mathbf{${Ud.toFixed(2)}\\text{ V}}$$</div>
+            `;
+          }
+          mathHtml += `
+            <div>$$I_d = \\frac{U_d}{R} = \\mathbf{${(Ud/R).toFixed(2)}\\text{ A}}, \\quad I_{SCR} = \\frac{I_d}{3} = \\mathbf{${(Ud/(3*R)).toFixed(2)}\\text{ A}}$$</div>
+          `;
+        }
+      } else if (state.circuit === '3ph_bridge') {
+        const isRL = state.load === 'RL_large';
+        let Ud = 0;
+
+        if (isRL) {
+          Ud = 2.34 * U2 * Math.cos(alphaRad);
+          warningHtml = `🚨 <b>CẢNH BÁO LỖI SLIDE 110:</b> Trong bài giải mẫu slide của thầy, đề cho <i>L rất lớn</i> nhưng thầy lại áp dụng công thức tải R! Khi đi thi có cuộn cảm $L$ lớn, bắt buộc dùng: $U_d = 2.34 U_2 \\cos\\alpha = ${Ud.toFixed(2)}\\text{ V}$.`;
+          mathHtml = `
+            <p><b>Điện áp chỉnh lưu cầu 3 pha có điều khiển (Tải L lớn, dòng phẳng):</b></p>
+            <div>$$U_d = \\frac{3\\sqrt{6}}{\\pi} U_2 \\cos\\alpha = 2.34 \\times ${U2} \\times \\cos(${alphaDeg}^\\circ) = \\mathbf{${Ud.toFixed(2)}\\text{ V}}$$</div>
+            <div>$$I_d = \\frac{U_d}{R} = \\mathbf{${(Ud/R).toFixed(2)}\\text{ A}}, \\quad I_{SCR} = \\frac{I_d}{3} = \\mathbf{${(Ud/(3*R)).toFixed(2)}\\text{ A}}$$</div>
+            <p><b>Điện áp ngược cực đại:</b> $$U_{ng.max} = \\sqrt{6}U_2 = \\mathbf{${(Math.sqrt(6)*U2).toFixed(2)}\\text{ V}}$$</p>
+          `;
+        } else {
+          if (alphaDeg <= 60) {
+            Ud = 2.34 * U2 * Math.cos(alphaRad);
+          } else {
+            Ud = 2.34 * U2 * (1 + Math.cos(alphaRad + Math.PI / 3));
+          }
+          mathHtml = `
+            <p><b>Điện áp chỉnh lưu cầu 3 pha (Tải thuần trở R):</b></p>
+            <div>$$U_d = \\mathbf{${Ud.toFixed(2)}\\text{ V}}, \\quad I_d = \\mathbf{${(Ud/R).toFixed(2)}\\text{ A}}$$</div>
+          `;
+        }
+      } else if (state.circuit === 'buck') {
+        const Vin = state.voltage;
+        const D = state.duty;
+        const Vo = Vin * D;
+        const L = 400e-6; // 400uH
+        const f = 20000;  // 20kHz
+        const deltaIL = ((Vin - Vo) * D) / (L * f);
+        const IL = Vo / R;
+        const ILmax = IL + deltaIL / 2;
+        const ILmin = IL - deltaIL / 2;
+        const Lmin = ((1 - D) * R) / (2 * f);
+
+        warningHtml = `⚠️ <b>SỬA LỖI SLIDE 254:</b> Slide thầy gõ nhầm công thức dòng đỉnh $I_{Lmax}$ của Buck thành Boost. Công thức chuẩn của Buck phải nhân với $V_o$ chứ không phải $V_d/(1-D)^2$.`;
+        mathHtml = `
+          <p><b>1. Điện áp ngõ ra:</b> $$V_o = D \\cdot V_{in} = ${D} \\times ${Vin} = \\mathbf{${Vo.toFixed(2)}\\text{ V}}$$</p>
+          <p><b>2. Độ nhấp nhô dòng cuộn cảm $\\Delta I_L$ ($f=20\\text{kHz}, L=400\\mu\\text{H}$):</b></p>
+          <div>$$\\Delta I_L = \\frac{(V_{in} - V_o) D}{L \\cdot f} = \\frac{(${Vin} - ${Vo.toFixed(1)}) \\times ${D}}{400\\mu \\times 20\\text{k}} = \\mathbf{${deltaIL.toFixed(2)}\\text{ A}}$$</div>
+          <p><b>3. Dòng điện cực đại và cực tiểu qua cuộn cảm:</b></p>
+          <div>$$I_{Lmax} = V_o \\left[\\frac{1}{R} + \\frac{1-D}{2Lf}\\right] = \\mathbf{${ILmax.toFixed(2)}\\text{ A}}, \\quad I_{Lmin} = \\mathbf{${ILmin.toFixed(2)}\\text{ A}}$$</div>
+          <p><b>4. Cuộn cảm tối thiểu để duy trì CCM:</b></p>
+          <div>$$L_{min} = \\frac{(1-D) R}{2f} = \\frac{(1-${D}) \\times ${R}}{2 \\times 20000} = \\mathbf{${(Lmin*1e6).toFixed(1)}\\mu\\text{H}}$$</div>
+        `;
+      } else if (state.circuit === 'boost') {
+        const Vin = state.voltage;
+        const D = state.duty;
+        const Vo = Vin / (1 - D);
+        const L = 65e-6;
+        const f = 40000;
+        const IL = Vin / (R * Math.pow(1 - D, 2));
+        const deltaIL = (Vin * D) / (L * f);
+        const ILmax = IL + deltaIL / 2;
+        const ILmin = IL - deltaIL / 2;
+
+        mathHtml = `
+          <p><b>1. Điện áp ngõ ra Boost Converter:</b></p>
+          <div>$$V_o = \\frac{V_{in}}{1 - D} = \\frac{${Vin}}{1 - ${D}} = \\mathbf{${Vo.toFixed(2)}\\text{ V}}$$</div>
+          <p><b>2. Dòng trung bình cuộn cảm:</b> $$I_L = \\frac{V_{in}}{R(1-D)^2} = \\mathbf{${IL.toFixed(2)}\\text{ A}}$$</p>
+          <p><b>3. Dòng đỉnh & đáy cuộn cảm ($L=65\\mu\\text{H}, f=40\\text{kHz}$):</b></p>
+          <div>$$I_{Lmax} = \\mathbf{${ILmax.toFixed(2)}\\text{ A}}, \\quad I_{Lmin} = \\mathbf{${ILmin.toFixed(2)}\\text{ A}}$$</div>
+          <p><b>4. Dòng qua khóa S và Diode D:</b></p>
+          <div>$$I_S = I_L \\cdot D = \\mathbf{${(IL*D).toFixed(2)}\\text{ A}}, \\quad I_D = I_L (1-D) = \\mathbf{${(IL*(1-D)).toFixed(2)}\\text{ A}}$$</div>
+        `;
+      } else if (state.circuit === 'ac_ac_1ph') {
+        const UR = U2 * Math.sqrt(1 - alphaRad / Math.PI + Math.sin(2 * alphaRad) / (2 * Math.PI));
+        const P = Math.pow(UR, 2) / R;
+        mathHtml = `
+          <p><b>1. Trị hiệu dụng điện áp ngõ ra trên tải $R$:</b></p>
+          <div>$$U_R = U \\sqrt{1 - \\frac{\\alpha}{\\pi} + \\frac{\\sin(2\\alpha)}{2\\pi}} = ${U2} \\sqrt{1 - \\frac{${alphaDeg}}{180} + \\frac{\\sin(${2*alphaDeg}^\\circ)}{2\\pi}} = \\mathbf{${UR.toFixed(2)}\\text{ V}}$$</div>
+          <p><b>2. Công suất tiêu thụ trên tải:</b> $$P = \\frac{U_R^2}{R} = \\frac{${UR.toFixed(1)}^2}{${R}} = \\mathbf{${P.toFixed(1)}\\text{ W}}$$</p>
+          <p><b>3. Hệ số công suất $\\cos\\varphi$:</b> $$\\cos\\varphi = \\frac{U_R}{U} = \\mathbf{${(UR/U2).toFixed(3)}}$$</p>
+        `;
+      } else if (state.circuit === 'inverter_3ph_180') {
+        const E = state.voltage;
+        const Up_rms = (Math.sqrt(2) / 3) * E;
+        const U1_rms = (Math.sqrt(2) / Math.PI) * E;
+        mathHtml = `
+          <p><b>1. Nghịch lưu nguồn áp 3 pha chế độ 180° (Six-Step Inverter):</b></p>
+          <p>Mỗi van dẫn liên tục $180^\\circ$, tại mỗi thời điểm luôn có đúng 3 van cùng dẫn.</p>
+          <p><b>2. Trị hiệu dụng điện áp pha tải đấu sao ($Y$):</b></p>
+          <div>$$U_{p,rms} = \\frac{\\sqrt{2}}{3} E = \\frac{\\sqrt{2}}{3} \\times ${E} = \\mathbf{${Up_rms.toFixed(2)}\\text{ V}}$$</div>
+          <p><b>3. Trị hiệu dụng sóng hài cơ bản bậc 1 ($n=1$):</b></p>
+          <div>$$U_{1,rms} = \\frac{\\sqrt{2}}{\\pi} E = \\mathbf{${U1_rms.toFixed(2)}\\text{ V}}$$</div>
+          <p><b>4. Trị trung bình dòng qua mỗi Transistor/IGBT:</b></p>
+          <div>$$I_{TAV} = \\frac{I_d}{3} = \\frac{P_t / E}{3}$$</div>
+        `;
+      }
+
+      warningBox.innerHTML = warningHtml || "💡 <i>Mẹo: Kéo thanh trượt tham số bên trái để quan sát biến thiên đồ thị tức thì.</i>";
+      mathBox.innerHTML = mathHtml;
+
+      // Render KaTeX equations
+      renderMathInElement(mathBox, {
+        delimiters: [
+          {left: '$$', right: '$$', display: true},
+          {left: '$', right: '$', display: false}
+        ],
+        throwOnError: false
+      });
+      renderMathInElement(warningBox, {
+        delimiters: [
+          {left: '$', right: '$', display: false}
+        ],
+        throwOnError: false
+      });
+    }
+
+    // ==========================================
+    // BỘ PHÂN TÍCH TỰ NHIÊN / GEMINI AI
+    // ==========================================
+    async function processExercisePrompt() {
+      const promptText = document.getElementById('promptInput').value.trim();
+      const apiKey = localStorage.getItem('GEMINI_API_KEY');
+      const btn = document.getElementById('btnAnalyze');
+
+      if (!promptText && !state.base64Image) {
+        alert("Vui lòng dán ảnh đề bài hoặc nhập câu hỏi bài tập!");
+        return;
+      }
+
+      // Nếu có API Key -> Gọi Gemini Vision
+      if (apiKey && apiKey.length > 5) {
+        btn.innerText = "Đang quét...";
+        btn.disabled = true;
+
+        try {
+          const resultJson = await callGeminiAPI(apiKey, promptText, state.base64Image);
+          if (resultJson) {
+            applyParsedJSON(resultJson);
+          }
+        } catch (err) {
+          console.error(err);
+          alert("Lỗi gọi Gemini API: " + err.message + "\nSẽ chuyển sang chế độ phân tích nhanh bằng từ khóa.");
+          parseRegexFallback(promptText);
+        } finally {
+          btn.innerText = "Giải";
+          btn.disabled = false;
+        }
+      } else {
+        // Không có API key -> Phân tích regex dự phòng offline
+        parseRegexFallback(promptText);
+      }
+    }
+
+    async function callGeminiAPI(apiKey, textPrompt, imageBase64) {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+
+      const contents = [];
+      const parts = [];
+
+      const systemInstruction = `Bạn là chuyên gia Điện tử công suất. Nhiệm vụ: Đọc đề bài và trích xuất tham số dạng JSON duy nhất.
+Không viết thêm văn bản giải thích.
+Schema JSON:
+{
+  "circuit": "3ph_half" | "3ph_bridge" | "buck" | "boost" | "ac_ac_1ph" | "inverter_3ph_180",
+  "voltage": number, // U2 hoặc Vin
+  "alpha": number,   // nếu có góc kích, đơn vị độ
+  "duty": number,    // nếu là DC-DC, hệ số D (0.0 đến 1.0)
+  "load": "R" | "RL_large",
+  "R": number
+}`;
+
+      parts.push({ text: systemInstruction + "\nĐề bài: " + (textPrompt || "Hãy phân tích đề bài trong bức ảnh này.") });
+
+      if (imageBase64) {
+        const base64Data = imageBase64.split(',')[1];
+        parts.push({
+          inline_data: {
+            mime_type: "image/png",
+            data: base64Data
+          }
+        });
+      }
+
+      contents.push({ parts });
+
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contents })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error ? errorData.error.message : response.statusText);
+      }
+
+      const resData = await response.json();
+      const rawText = resData.candidates[0].content.parts[0].text;
+      const cleanJson = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+      return JSON.parse(cleanJson);
+    }
+
+    function applyParsedJSON(data) {
+      if (data.circuit) state.circuit = data.circuit;
+      if (data.voltage) state.voltage = data.voltage;
+      if (data.alpha !== undefined) state.alpha = data.alpha;
+      if (data.duty !== undefined) state.duty = data.duty;
+      if (data.load) state.load = data.load;
+      if (data.R) state.R = data.R;
+
+      syncInputsFromState();
+      updateSimulation();
+    }
+
+    // Parser offline từ khóa nếu người dùng không dùng API Key
+    function parseRegexFallback(text) {
+      const lower = text.toLowerCase();
+
+      if (lower.includes('buck') || lower.includes('hạ áp')) state.circuit = 'buck';
+      else if (lower.includes('boost') || lower.includes('tăng áp')) state.circuit = 'boost';
+      else if (lower.includes('cầu 3 pha') || lower.includes('cầu ba pha')) state.circuit = '3ph_bridge';
+      else if (lower.includes('tia 3 pha') || lower.includes('tia ba pha')) state.circuit = '3ph_half';
+      else if (lower.includes('điều áp') || lower.includes('ac-ac')) state.circuit = 'ac_ac_1ph';
+      else if (lower.includes('nghịch lưu')) state.circuit = 'inverter_3ph_180';
+
+      const vMatch = text.match(/(?:u|u2|vin|v|e)\s*=\s*(\d+)/i) || text.match(/(\d+)\s*(?:v|vdc)/i);
+      if (vMatch) state.voltage = parseFloat(vMatch[1]);
+
+      const aMatch = text.match(/(?:alpha|anpha|a|góc kích)\s*=\s*(\d+)/i) || text.match(/(\d+)\s*(?:độ|deg)/i);
+      if (aMatch) state.alpha = parseFloat(aMatch[1]);
+
+      const dMatch = text.match(/(?:d|duty)\s*=\s*(0\.\d+)/i);
+      if (dMatch) state.duty = parseFloat(dMatch[1]);
+
+      const rMatch = text.match(/(?:r|rd)\s*=\s*(\d+)/i) || text.match(/(\d+)\s*(?:ohm|ω)/i);
+      if (rMatch) state.R = parseFloat(rMatch[1]);
+
+      if (lower.includes('l lớn') || lower.includes('liên tục') || lower.includes('cảm')) {
+        state.load = 'RL_large';
+      } else {
+        state.load = 'R';
+      }
+
+      syncInputsFromState();
+      updateSimulation();
+    }
+  </script>
+</body>
+</html>
